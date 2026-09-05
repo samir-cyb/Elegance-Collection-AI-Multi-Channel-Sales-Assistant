@@ -1,0 +1,29 @@
+<!DOCTYPE html>
+<html lang="bn">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Admin Login — এলিগ্যান্স কালেকশন</title>
+<link rel="stylesheet" href="/css/style.css">
+</head>
+<body>
+
+<div class="admin-login-wrap">
+  <div class="card">
+    <h2>Admin Panel</h2>
+    <p style="color:var(--muted); margin-bottom:30px;">Pixel &amp; Traffic Analytics Dashboard</p>
+    <button class="btn" onclick="enterDemo()">Demo হিসেবে প্রবেশ করুন</button>
+  </div>
+  <a href="/" style="color:var(--muted); font-size:.9rem;">← হোমে ফিরে যান</a>
+</div>
+
+<script>
+function enterDemo() {
+  // Demo-only access: no real auth. Before production use, replace this
+  // with a real login (session/JWT) — see PROJECT_PLAN.md section 8 notes.
+  sessionStorage.setItem("admin_demo", "true");
+  window.location.href = "/admin-dashboard.html";
+}
+</script>
+</body>
+</html>

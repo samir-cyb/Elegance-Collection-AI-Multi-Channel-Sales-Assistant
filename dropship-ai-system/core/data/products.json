@@ -1,0 +1,164 @@
+{
+  "shop_name": "Elegance Collection",
+  "shop_bn": "এলিগ্যান্স কালেকশন",
+  "last_updated": "2026-08-14",
+  "products": [
+    {
+      "id": "DRESS001",
+      "name": "Unstitched 3 Piece Embroidered Dress",
+      "name_bn": "আনস্টিচড ৩ পিস এমব্রয়ডারি ড্রেস",
+      "category": "salwar_kameez",
+      "price": 2950,
+      "discount_price": 2480,
+      "discount_percent": 16,
+      "stock": 25,
+      "details": {
+        "body": "Indian soft Jorget embroidery with sequence",
+        "orna": "Soft jorget with embroidery sequence and cutwork",
+        "pant_inner": "Santon"
+      },
+      "colors": [
+        {
+          "name": "Default",
+          "stock": 25,
+          "image": "dress-1-600x600.webp"
+        }
+      ],
+      "description_bn": "প্রিমিয়াম আনস্টিচড ৩ পিস, সফট জর্জেট এমব্রয়ডারি ও সিকুয়েন্স কাজ",
+      "delivery_days": "3-5",
+      "is_available": true
+    },
+    {
+      "id": "DRESS002",
+      "name": "Rosemeen Series Pakistani Designer Suit",
+      "name_bn": "রোজমিন সিরিজ পাকিস্তানি ডিজাইনার স্যুট",
+      "category": "salwar_kameez",
+      "price": 2950,
+      "discount_price": 2380,
+      "discount_percent": 19,
+      "stock": 20,
+      "details": {
+        "body": "Indian soft Jorget embroidery with sequence",
+        "orna": "Soft jorget with embroidery sequence and cutwork",
+        "pant_inner": "Santon"
+      },
+      "colors": [
+        {
+          "name": "Default",
+          "stock": 20,
+          "image": "dress 2.webp"
+        }
+      ],
+      "description_bn": "পাকিস্তানি ডিজাইনার স্যুট, সফট জর্জেট এমব্রয়ডারি সহ",
+      "delivery_days": "3-5",
+      "is_available": true
+    },
+    {
+      "id": "DRESS003",
+      "name": "Georgette Embroidered Party Dress",
+      "name_bn": "জর্জেট এমব্রয়ডারি পার্টি ড্রেস",
+      "category": "salwar_kameez",
+      "price": 2450,
+      "discount_price": 2450,
+      "discount_percent": 0,
+      "stock": 30,
+      "details": {
+        "fabric": "Jimichu",
+        "kameez_length": "44 inches",
+        "orna_fabric": "Jimichu",
+        "orna_length": "84 inches",
+        "orna_width": "36 inches"
+      },
+      "colors": [
+        {
+          "name": "Black",
+          "stock": 10,
+          "image": "dress 3 black.webp"
+        },
+        {
+          "name": "Purple",
+          "stock": 10,
+          "image": "dress 3 purple.webp"
+        },
+        {
+          "name": "Red",
+          "stock": 10,
+          "image": "dress 3 red.webp"
+        }
+      ],
+      "description_bn": "জর্জেট কাপড়ে এমব্রয়ডারি পার্টি ড্রেস, ৩টি রঙে পাওয়া যাচ্ছে",
+      "delivery_days": "3-5",
+      "is_available": true
+    },
+    {
+      "id": "DRESS004",
+      "name": "Georgette Pakistani Salwar Suits",
+      "name_bn": "জর্জেট পাকিস্তানি সালোয়ার স্যুট",
+      "category": "salwar_kameez",
+      "price": 2390,
+      "discount_price": 2390,
+      "discount_percent": 0,
+      "stock": 30,
+      "details": {
+        "body": "Indian soft Jorget embroidery with sequence",
+        "orna": "Soft jorget with embroidery sequence and cutwork",
+        "pant_inner": "Santon"
+      },
+      "colors": [
+        {
+          "name": "Ash",
+          "stock": 10,
+          "image": "dress 4 ash.webp"
+        },
+        {
+          "name": "Purple",
+          "stock": 10,
+          "image": "dress 4 purple.webp"
+        },
+        {
+          "name": "Yellow",
+          "stock": 10,
+          "image": "dress 4 yellow.webp"
+        }
+      ],
+      "description_bn": "জর্জেট পাকিস্তানি সালোয়ার স্যুট, ৩টি রঙে পাওয়া যাচ্ছে",
+      "delivery_days": "3-5",
+      "is_available": true
+    },
+    {
+      "id": "DRESS005",
+      "name": "Georgette Pakistani Salwar Suits (Series 2)",
+      "name_bn": "জর্জেট পাকিস্তানি সালোয়ার স্যুট (সিরিজ ২)",
+      "category": "salwar_kameez",
+      "price": 2390,
+      "discount_price": 2390,
+      "discount_percent": 0,
+      "stock": 30,
+      "details": {
+        "body": "Indian soft Jorget embroidery with sequence",
+        "orna": "Soft jorget with embroidery sequence and cutwork",
+        "pant_inner": "Santon"
+      },
+      "colors": [
+        {
+          "name": "Light Green",
+          "stock": 10,
+          "image": "dress 5 light green.webp"
+        },
+        {
+          "name": "Pink",
+          "stock": 10,
+          "image": "dress 5 pink.webp"
+        },
+        {
+          "name": "Purple",
+          "stock": 10,
+          "image": "dress 5 purple.webp"
+        }
+      ],
+      "description_bn": "জর্জেট পাকিস্তানি সালোয়ার স্যুট, ৩টি রঙে পাওয়া যাচ্ছে",
+      "delivery_days": "3-5",
+      "is_available": true
+    }
+  ]
+}

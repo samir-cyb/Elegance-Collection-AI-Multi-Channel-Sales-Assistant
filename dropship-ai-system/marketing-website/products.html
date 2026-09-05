@@ -1,0 +1,76 @@
+<!DOCTYPE html>
+<html lang="bn">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>পণ্য — এলিগ্যান্স কালেকশন</title>
+<link rel="stylesheet" href="/css/style.css">
+</head>
+<body>
+
+<nav class="nav">
+  <div class="logo">এলিগ্যান্স কালেকশন</div>
+  <div class="links">
+    <a href="/">হোম</a>
+    <a href="/products.html">পণ্য</a>
+    <a href="/chatbot.html">চ্যাটবট</a>
+    <a href="/admin-login.html">Admin</a>
+  </div>
+</nav>
+
+<section class="section" style="padding-top:140px;">
+  <h2>আমাদের কালেকশন</h2>
+  <p class="lead">প্রতিটা পণ্যে ক্লিক করলে চ্যাটবট ওপেন হয়ে সরাসরি অর্ডার করার সুযোগ পাবেন।</p>
+  <div class="product-grid" id="product-grid"></div>
+</section>
+
+<footer class="footer">© 2026 Elegance Collection — Demo build for showcase purposes</footer>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.5/gsap.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.5/ScrollTrigger.min.js"></script>
+<script src="/js/pixel.js"></script>
+<script>
+const SWATCH = {
+  "Black": "#111", "Purple": "#7b3fa0", "Red": "#c0392b", "Ash": "#a9a9a9",
+  "Yellow": "#e6c229", "Light Green": "#8fce7a", "Pink": "#e79fc4", "Default": "#b6425a"
+};
+
+async function loadProducts() {
+  const res = await fetch("/api/products");
+  const data = await res.json();
+  const grid = document.getElementById("product-grid");
+
+  data.products.forEach(p => {
+    const card = document.createElement("div");
+    card.className = "product-card";
+    const cover = p.colors[0].image;
+    card.innerHTML = `
+      <img src="/assets/products/${cover}" alt="${p.name}">
+      <div class="info">
+        <h4>${p.name_bn}</h4>
+        <div class="price">৳${p.discount_price}
+          ${p.discount_percent > 0 ? `<span class="old">৳${p.price}</span>` : ""}
+        </div>
+        <div class="swatches">
+          ${p.colors.map(c => `<span title="${c.name}" style="background:${SWATCH[c.name] || '#ccc'}"></span>`).join("")}
+        </div>
+      </div>
+    `;
+    card.addEventListener("click", () => {
+      trackEvent("ViewContent", { product_id: p.id, value: p.discount_price });
+      window.location.href = "/chatbot.html?product=" + encodeURIComponent(p.name_bn);
+    });
+    grid.appendChild(card);
+  });
+
+  gsap.registerPlugin(ScrollTrigger);
+  gsap.from(".product-card", {
+    y: 50, opacity: 0, duration: 0.7, stagger: 0.08,
+    scrollTrigger: { trigger: ".product-grid", start: "top 90%" },
+  });
+}
+
+loadProducts();
+</script>
+</body>
+</html>

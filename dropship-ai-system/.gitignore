@@ -1,0 +1,24 @@
+# --- Secrets: never commit these ---
+.env
+env_content_rename_to_dotenv.txt
+
+# --- Python ---
+__pycache__/
+*.py[cod]
+*$py.class
+.venv/
+venv/
+*.egg-info/
+
+# --- Local databases & generated data ---
+core/data/app.db
+core/data/faiss_index/
+
+# --- OS / editor junk ---
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
+
+# --- Logs ---
+*.log

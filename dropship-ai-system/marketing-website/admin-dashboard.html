@@ -1,0 +1,144 @@
+<!DOCTYPE html>
+<html lang="bn">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Admin Dashboard — এলিগ্যান্স কালেকশন</title>
+<link rel="stylesheet" href="/css/style.css">
+</head>
+<body>
+
+<div class="admin-topbar">
+  <div class="logo">📊 Pixel &amp; Traffic Dashboard</div>
+  <a href="/admin-login.html" onclick="sessionStorage.removeItem('admin_demo')" class="btn ghost">লগ আউট</a>
+</div>
+
+<div class="admin-content">
+  <div class="stat-grid" id="stat-grid"></div>
+
+  <h3>দৈনিক ইভেন্ট (গত ১৪ দিন)</h3>
+  <div class="bar-chart" id="bar-chart"></div>
+
+  <h3 style="margin-top:50px;">📦 অর্ডারসমূহ</h3>
+  <div id="orders-wrap">
+    <table class="orders-table" id="orders-table">
+      <thead>
+        <tr>
+          <th>#</th>
+          <th>নাম</th>
+          <th>ফোন</th>
+          <th>ঠিকানা</th>
+          <th>প্রোডাক্ট</th>
+          <th>রং</th>
+          <th>পরিমাণ</th>
+          <th>মোট দাম</th>
+          <th>প্ল্যাটফর্ম</th>
+          <th>স্ট্যাটাস</th>
+          <th>সময়</th>
+        </tr>
+      </thead>
+      <tbody id="orders-body"></tbody>
+    </table>
+    <p id="orders-empty" style="display:none; color:var(--muted);">এখনো কোনো অর্ডার আসেনি।</p>
+  </div>
+</div>
+
+<script>
+if (sessionStorage.getItem("admin_demo") !== "true") {
+  window.location.href = "/admin-login.html";
+}
+
+async function loadStats() {
+  const res = await fetch("/api/admin/stats");
+  const data = await res.json();
+
+  const statGrid = document.getElementById("stat-grid");
+  const cards = [
+    { label: "Total Events (all pages)", num: data.total_events },
+    { label: "Total Orders (Leads)", num: data.total_orders },
+    ...data.by_event.map(e => ({ label: e.event_name, num: e.count })),
+  ];
+  statGrid.innerHTML = cards.map(c => `
+    <div class="stat-card"><div class="num">${c.num}</div><div class="label">${c.label}</div></div>
+  `).join("");
+
+  const chart = document.getElementById("bar-chart");
+  const max = Math.max(1, ...data.by_day.map(d => d.count));
+  chart.innerHTML = data.by_day.map(d => `
+    <div class="bar" style="height:${(d.count / max) * 100}%">
+      <span>${d.count}</span>
+    </div>
+  `).join("") || "<p style='color:var(--muted)'>এখনো কোনো ইভেন্ট নেই — website ব্রাউজ করলে ডাটা আসা শুরু করবে।</p>";
+}
+
+const STATUS_OPTIONS = ["pending", "confirmed", "shipped", "delivered", "cancelled"];
+
+async function loadOrders() {
+  const res = await fetch("/api/admin/orders");
+  const data = await res.json();
+  const orders = data.orders || [];
+
+  const tbody = document.getElementById("orders-body");
+  const table = document.getElementById("orders-table");
+  const empty = document.getElementById("orders-empty");
+
+  if (!orders.length) {
+    table.style.display = "none";
+    empty.style.display = "block";
+    return;
+  }
+  table.style.display = "table";
+  empty.style.display = "none";
+
+  tbody.innerHTML = orders.map(o => `
+    <tr>
+      <td>${o.id}</td>
+      <td>${escapeHtml(o.customer_name)}</td>
+      <td>${escapeHtml(o.phone)}</td>
+      <td class="order-address">${escapeHtml(o.address)}</td>
+      <td>${escapeHtml(o.product)}</td>
+      <td>${escapeHtml(o.color || "-")}</td>
+      <td>${o.quantity}</td>
+      <td>৳${o.total_price ?? "-"}</td>
+      <td>${escapeHtml(o.platform || "-")}</td>
+      <td>
+        <select class="status-select" data-order-id="${o.id}" onchange="changeStatus(this)">
+          ${STATUS_OPTIONS.map(s => `<option value="${s}" ${s === o.status ? "selected" : ""}>${s}</option>`).join("")}
+        </select>
+      </td>
+      <td>${formatDate(o.created_at)}</td>
+    </tr>
+  `).join("");
+}
+
+function escapeHtml(s) {
+  return (s ?? "").toString().replace(/[&<>"']/g, c => ({
+    "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;",
+  }[c]));
+}
+
+function formatDate(iso) {
+  if (!iso) return "-";
+  try {
+    const d = new Date(iso);
+    return d.toLocaleString("bn-BD", { dateStyle: "medium", timeStyle: "short" });
+  } catch (e) {
+    return iso;
+  }
+}
+
+async function changeStatus(select) {
+  const orderId = select.dataset.orderId;
+  const status = select.value;
+  await fetch(`/api/admin/orders/${orderId}/status`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ status }),
+  });
+}
+
+loadStats();
+loadOrders();
+</script>
+</body>
+</html>

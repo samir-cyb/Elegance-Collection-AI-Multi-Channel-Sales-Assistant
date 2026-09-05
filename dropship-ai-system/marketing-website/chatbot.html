@@ -1,0 +1,264 @@
+<!DOCTYPE html>
+<html lang="bn">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>চ্যাটবট — এলিগ্যান্স কালেকশন</title>
+<link rel="stylesheet" href="/css/style.css">
+</head>
+<body class="chat-page-body">
+
+<nav class="nav">
+  <div class="logo">এলিগ্যান্স কালেকশন</div>
+  <div class="links">
+    <a href="/">হোম</a>
+    <a href="/products.html">পণ্য</a>
+    <a href="/chatbot.html">চ্যাটবট</a>
+    <a href="/admin-login.html">Admin</a>
+  </div>
+</nav>
+
+<div class="chat-page">
+  <div class="chat-page-head">
+    <div>🤖 <strong>রাফি</strong> — AI শপিং অ্যাসিস্ট্যান্ট</div>
+    <button class="btn ghost small" onclick="startNewChat()">নতুন কথোপকথন</button>
+  </div>
+  <div class="chat-page-body-inner" id="messages"></div>
+
+  <div class="chat-image-preview" id="image-preview" style="display:none;">
+    <img id="preview-thumb" src="" alt="preview">
+    <button class="remove-preview" onclick="clearPendingImage()">✕</button>
+  </div>
+
+  <div class="chat-page-input">
+    <button class="btn ghost attach-btn" onclick="document.getElementById('file-input').click()" title="ছবি সংযুক্ত করুন">📷</button>
+    <input type="file" id="file-input" accept="image/*" style="display:none;">
+    <textarea id="msg" rows="1" placeholder="আপনার প্রশ্ন লিখুন, বা একটা ছবি সংযুক্ত করুন..."></textarea>
+    <button class="btn" id="send-btn" onclick="send()">পাঠান</button>
+  </div>
+</div>
+
+<div class="lightbox" id="lightbox" onclick="closeLightbox()">
+  <img id="lightbox-img" src="" alt="">
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/marked/11.1.1/marked.min.js"></script>
+<script src="/js/pixel.js"></script>
+<script>
+const UID_KEY = "elegance_chat_uid";
+const HISTORY_KEY = "elegance_chat_history";
+
+// Persist the same user_id across page loads/navigation so the backend's
+// conversation memory (and this chat's visible history) continues instead
+// of starting over every time the page is opened.
+let uid = localStorage.getItem(UID_KEY);
+if (!uid) {
+  uid = "web_" + Math.random().toString(36).substr(2, 9);
+  localStorage.setItem(UID_KEY, uid);
+}
+
+const msgs = document.getElementById("messages");
+const input = document.getElementById("msg");
+const fileInput = document.getElementById("file-input");
+const previewBox = document.getElementById("image-preview");
+const previewThumb = document.getElementById("preview-thumb");
+
+let pendingImage = null; // { dataUrl, base64, mime }
+let isSending = false; // guards against double-submit while a (possibly slow, 30-65s) reply is in flight
+const sendBtn = document.getElementById("send-btn");
+
+function loadHistory() {
+  try {
+    return JSON.parse(localStorage.getItem(HISTORY_KEY) || "[]");
+  } catch (e) {
+    return [];
+  }
+}
+
+function saveHistory(history) {
+  try {
+    localStorage.setItem(HISTORY_KEY, JSON.stringify(history));
+  } catch (e) {
+    // Quota exceeded (too many stored images) — drop older images and retry once.
+    const trimmed = history.map((m, i) => i < history.length - 6 ? { ...m, img: undefined } : m);
+    try { localStorage.setItem(HISTORY_KEY, JSON.stringify(trimmed)); } catch (e2) { /* give up silently */ }
+  }
+}
+
+function renderMsg(who, text, img) {
+  const div = document.createElement("div");
+  div.className = "chat-msg " + who;
+  const textHtml = who === "bot" ? marked.parse(text || "") : (text || "").replace(/</g, "&lt;");
+  const imgHtml = img ? `<img src="${img}" alt="uploaded">` : "";
+  div.innerHTML = `<span>${imgHtml}${textHtml}</span>`;
+  msgs.appendChild(div);
+  msgs.scrollTop = msgs.scrollHeight;
+  return div;
+}
+
+function addMsg(who, text, img, persist = true) {
+  renderMsg(who, text, img);
+  if (persist) {
+    const history = loadHistory();
+    history.push({ who, text, img: img || undefined, ts: Date.now() });
+    saveHistory(history);
+  }
+}
+
+function addTyping() {
+  const div = document.createElement("div");
+  div.className = "chat-msg bot typing";
+  div.innerHTML = `<span>রাফি লিখছে...</span>`;
+  msgs.appendChild(div);
+  msgs.scrollTop = msgs.scrollHeight;
+  return div;
+}
+
+// --- Image attach: resize client-side (max 1024px, JPEG) before sending,
+// so uploads are fast and don't blow past Gemini's request size limit ---
+fileInput.addEventListener("change", () => {
+  const file = fileInput.files[0];
+  if (!file) return;
+  const reader = new FileReader();
+  reader.onload = e => {
+    const img = new Image();
+    img.onload = () => {
+      const MAX = 1024;
+      let { width, height } = img;
+      if (width > MAX || height > MAX) {
+        const scale = MAX / Math.max(width, height);
+        width = Math.round(width * scale);
+        height = Math.round(height * scale);
+      }
+      const canvas = document.createElement("canvas");
+      canvas.width = width;
+      canvas.height = height;
+      canvas.getContext("2d").drawImage(img, 0, 0, width, height);
+      const dataUrl = canvas.toDataURL("image/jpeg", 0.82);
+      pendingImage = {
+        dataUrl,
+        base64: dataUrl.split(",")[1],
+        mime: "image/jpeg",
+      };
+      previewThumb.src = dataUrl;
+      previewBox.style.display = "flex";
+    };
+    img.src = e.target.result;
+  };
+  reader.readAsDataURL(file);
+  fileInput.value = ""; // allow selecting the same file again later
+});
+
+function clearPendingImage() {
+  pendingImage = null;
+  previewBox.style.display = "none";
+  previewThumb.src = "";
+}
+
+async function send() {
+  // Guard against double-submit: replies can take 30-65+ seconds, and
+  // without this a customer double-tapping Enter/পাঠান (or a flaky
+  // network retrying the request) could send the same confirmation
+  // message twice — each one independently detected as a confirmed
+  // order and saved as a DUPLICATE row. This was the root cause of
+  // "same order shows twice" in the admin dashboard.
+  if (isSending) return;
+
+  const message = input.value.trim();
+  if (!message && !pendingImage) return;
+
+  isSending = true;
+  sendBtn.disabled = true;
+  input.disabled = true;
+
+  const imgToSend = pendingImage;
+  addMsg("user", message, imgToSend ? imgToSend.dataUrl : null);
+  input.value = "";
+  autoGrow();
+  clearPendingImage();
+
+  const typing = addTyping();
+
+  let d;
+  try {
+    const r = await fetch("/chat", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        user_id: uid,
+        message,
+        image_base64: imgToSend ? imgToSend.base64 : undefined,
+        image_mime: imgToSend ? imgToSend.mime : undefined,
+      }),
+    });
+    d = await r.json();
+  } catch (e) {
+    typing.remove();
+    addMsg("bot", "দুঃখিত, নেটওয়ার্ক সমস্যা হচ্ছে। আবার চেষ্টা করুন।");
+    isSending = false;
+    sendBtn.disabled = false;
+    input.disabled = false;
+    input.focus();
+    return;
+  }
+
+  typing.remove();
+  addMsg("bot", d.reply);
+
+  if (d.order_placed) {
+    trackEvent("Lead", { user_id: uid });
+  }
+
+  isSending = false;
+  sendBtn.disabled = false;
+  input.disabled = false;
+  input.focus();
+}
+
+function startNewChat() {
+  localStorage.removeItem(HISTORY_KEY);
+  localStorage.removeItem(UID_KEY);
+  location.reload();
+}
+
+// --- Auto-growing textarea, so the full message is visible while typing ---
+function autoGrow() {
+  input.style.height = "auto";
+  input.style.height = Math.min(input.scrollHeight, 160) + "px";
+}
+input.addEventListener("input", autoGrow);
+input.addEventListener("keydown", e => {
+  if (e.key === "Enter" && !e.shiftKey) {
+    e.preventDefault();
+    send();
+  }
+});
+
+// --- Image lightbox: tap any dress photo (bot's or your own upload) to view full-size ---
+const lightbox = document.getElementById("lightbox");
+const lightboxImg = document.getElementById("lightbox-img");
+msgs.addEventListener("click", e => {
+  if (e.target.tagName === "IMG") {
+    lightboxImg.src = e.target.src;
+    lightbox.classList.add("open");
+  }
+});
+function closeLightbox() {
+  lightbox.classList.remove("open");
+  lightboxImg.src = "";
+}
+
+// --- Restore previous conversation, or show a welcome message ---
+const history = loadHistory();
+if (history.length) {
+  history.forEach(m => renderMsg(m.who, m.text, m.img));
+} else {
+  const params = new URLSearchParams(location.search);
+  const product = params.get("product");
+  addMsg("bot", product
+    ? `স্বাগতম! 👋 আমি রাফি। "${product}" নিয়ে জানতে চান?`
+    : "স্বাগতম! 👋 আমি রাফি। কী দরকার বলুন! আপনি চাইলে কোনো ড্রেসের ছবিও পাঠাতে পারেন 📷");
+}
+</script>
+</body>
+</html>
