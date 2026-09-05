@@ -15,16 +15,46 @@ for what each log line means.
 import json
 import logging
 import os
+import re
 import time
+from urllib.parse import urljoin
 
 from fastapi import APIRouter, Request
 from fastapi.responses import PlainTextResponse
 from core.gemini_brain import chat, GeminiConfigError
 from core.order_manager import is_order_confirmed, strip_order_json, process_confirmed_order
-from modules.facebook_bot.facebook_client import send_fb_reply
+from modules.facebook_bot.facebook_client import send_fb_reply, send_fb_image
 
 router = APIRouter()
 logger = logging.getLogger("facebook_bot")
+
+# Website chat renders Gemini's reply as Markdown (marked.js), so
+# resolve_image_tags() in gemini_brain.py returns things like
+# "![alt](/assets/products/dress-1.webp)" and "**bold**". Messenger has no
+# Markdown renderer at all — it just shows that literally as text, and a
+# relative "/assets/..." path means nothing to Facebook's servers anyway
+# (they need a full public https:// URL to fetch and attach an image).
+#
+# So for Facebook we do the two things marked.js + the browser normally do
+# for us: pull out each image link, turn it into an absolute URL, and send
+# it as a real image attachment via the Send API — then strip the
+# Markdown image/bold syntax out of the text reply so customers don't see
+# literal "![...]()" or "**" characters.
+_MD_IMAGE_RE = re.compile(r"!\[([^\]]*)\]\(([^)]+)\)")
+
+
+def _split_text_and_images(reply: str, base_url: str) -> tuple[str, list[str]]:
+    image_urls = []
+
+    def _extract(match):
+        image_urls.append(urljoin(base_url, match.group(2)))
+        return ""
+
+    text_only = _MD_IMAGE_RE.sub(_extract, reply)
+    text_only = re.sub(r"\*\*(.+?)\*\*", r"\1", text_only)  # **bold** -> bold
+    text_only = re.sub(r"(?<!\*)\*(?!\*)([^*\n]+?)\*(?!\*)", r"\1", text_only)  # *italic* -> italic
+    text_only = re.sub(r"\n{3,}", "\n\n", text_only).strip()
+    return text_only, image_urls
 
 
 @router.get("/webhook/facebook")
@@ -126,7 +156,15 @@ async def fb_message(request: Request):
                 logger.info("[fb_message] process_confirmed_order result for psid=%s: %s", sender, order)
                 reply = strip_order_json(reply)  # never show the raw JSON block to the customer
 
-            send_fb_reply(sender, reply)
+            text_only, image_urls = _split_text_and_images(reply, str(request.base_url))
+            logger.info(
+                "[fb_message] psid=%s reply has %d image(s) to send as attachments",
+                sender, len(image_urls),
+            )
+            if text_only:
+                send_fb_reply(sender, text_only)
+            for url in image_urls:
+                send_fb_image(sender, url)
 
     elapsed = time.time() - t0
     logger.info("[fb_message] Done — processed %d text message(s) in %.2fs", processed, elapsed)

@@ -49,3 +49,4 @@ data/faiss_index/*.json
 
 # Local model cache (if you keep the embedding model outside the repo)
 models/
+Claude outputs/
