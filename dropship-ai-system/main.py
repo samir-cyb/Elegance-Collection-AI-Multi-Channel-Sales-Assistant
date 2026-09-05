@@ -69,21 +69,30 @@ setup_database()
 # seconds the very first time) so the first customer message isn't slow.
 # If the embedding model path is wrong/missing, we log it loudly but don't
 # crash the server — rag_engine.search() falls back to the full catalog.
-try:
-    _products_data = load_products()
-    rag_engine.build_or_load_index(_products_data)
-    logger.info("RAG index ready (product retrieval via FAISS is active).")
-except Exception as e:
-    logger.error(
-        "=" * 70 + "\n"
-        "RAG index could not be built! The bot will still work, but will\n"
-        "fall back to sending the FULL product catalog on every message\n"
-        "instead of using smart retrieval.\n"
-        "Fix: check EMBEDDING_MODEL_PATH in your '.env' file points to a\n"
-        "valid local sentence-transformers model folder.\n"
-        f"Error: {e}\n"
-        + "=" * 70
+RAG_ENABLED = os.getenv("ENABLE_RAG", "true").lower() == "true"
+
+if not RAG_ENABLED:
+    logger.info(
+        "ENABLE_RAG=false — skipping the embedding model entirely (saves ~1GB+ RAM, "
+        "needed on small/free hosting plans). The bot will just use the full product "
+        "catalog on every message, which is fine for a small catalog like this one."
     )
+else:
+    try:
+        _products_data = load_products()
+        rag_engine.build_or_load_index(_products_data)
+        logger.info("RAG index ready (product retrieval via FAISS is active).")
+    except Exception as e:
+        logger.error(
+            "=" * 70 + "\n"
+            "RAG index could not be built! The bot will still work, but will\n"
+            "fall back to sending the FULL product catalog on every message\n"
+            "instead of using smart retrieval.\n"
+            "Fix: check EMBEDDING_MODEL_PATH in your '.env' file points to a\n"
+            "valid local sentence-transformers model folder.\n"
+            f"Error: {e}\n"
+            + "=" * 70
+        )
 
 # --- Modules (comment out one to sell the other separately) ---
 app.include_router(website_chat_router)
@@ -123,8 +132,13 @@ async def admin_dashboard_page():
 
 if __name__ == "__main__":
     import uvicorn
+    # Render (and most hosts) assign the port dynamically via the PORT env
+    # var — a hardcoded port=8000 means the host can never detect the app
+    # as "listening" in production. Locally, PORT isn't set, so this still
+    # defaults to 8000 exactly like before.
+    port = int(os.getenv("PORT", 8000))
     print("\n" + "=" * 50)
     print("  Server ready! Open this in your browser:")
-    print("  http://localhost:8000")
+    print(f"  http://localhost:{port}")
     print("=" * 50 + "\n")
-    uvicorn.run(app, host="0.0.0.0", port=8000)
+    uvicorn.run(app, host="0.0.0.0", port=port)

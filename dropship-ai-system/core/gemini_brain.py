@@ -29,6 +29,12 @@ from google import genai
 from google.genai import types
 from core import rag_engine
 
+# Same switch as main.py — when the embedding model is disabled (e.g. to
+# fit a low-RAM hosting plan), always fall back to the full catalog instead
+# of calling rag_engine.search() (which would otherwise lazily load the
+# heavy sentence-transformers model on first use anyway).
+RAG_ENABLED = os.getenv("ENABLE_RAG", "true").lower() == "true"
+
 load_dotenv()
 
 logging.basicConfig(
@@ -310,12 +316,11 @@ def chat(user_id: str, message: str, image_base64: str = None, image_mime: str =
     # right one wasn't in the shortlist — this was reproduced as "purple
     # dress 5 detected as dress 1". So for image turns we always pass the
     # FULL catalog, same as the reference images.
-    if has_image:
+    if has_image or not RAG_ENABLED:
         retrieved_products = data["products"]
         logger.info(
-            "[chat] user=%s has_image=True — RAG filtering SKIPPED, using full catalog (%d products) "
-            "so image matching can pick the correct product id.",
-            user_id, len(retrieved_products),
+            "[chat] user=%s has_image=%s RAG_ENABLED=%s — using full catalog (%d products).",
+            user_id, has_image, RAG_ENABLED, len(retrieved_products),
         )
     else:
         recent_context = " ".join(turn["content"] for turn in history[-4:])
