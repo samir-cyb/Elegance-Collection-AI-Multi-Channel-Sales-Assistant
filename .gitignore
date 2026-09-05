@@ -1,0 +1,51 @@
+# Specific files
+cloudflared.exe
+dropship-ai-system.zip
+ai\ automation/
+
+# Environment variables
+.env
+.env.local
+.env.*.local
+
+# Python cache
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+.Python
+*.so
+*.egg
+*.egg-info/
+dist/
+build/
+eggs/
+parts/
+var/
+sdist/
+develop-eggs/
+.installed.cfg
+lib/
+lib64/
+venv/
+.venv/
+ENV/
+env/
+
+# Database
+data/app.db
+data/faiss_index/*.index
+data/faiss_index/*.json
+
+# Logs
+*.log
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+.DS_Store
+
+# Local model cache (if you keep the embedding model outside the repo)
+models/
