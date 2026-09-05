@@ -12,7 +12,7 @@ import os
 from pathlib import Path
 from fastapi import FastAPI
 from fastapi.staticfiles import StaticFiles
-from fastapi.responses import FileResponse
+from fastapi.responses import FileResponse, Response
 from fastapi.middleware.cors import CORSMiddleware
 from dotenv import load_dotenv
 
@@ -100,6 +100,32 @@ app.include_router(facebook_router)
 app.include_router(admin_router)
 
 # --- Product images ---
+# Facebook Messenger's Send API attachment fetcher reliably supports
+# jpg/png/gif but frequently rejects .webp with "(#100) Upload failed"
+# (error_subcode 2018007) — our whole catalog is stored as .webp because
+# it's smaller and every browser (website chat) renders it fine, so
+# instead of re-exporting every product photo we just convert on the fly,
+# only for whoever asks for the *-jpg version (Facebook does; the website
+# keeps using the original /assets/products/ webp URLs, unaffected).
+@app.get("/assets/products-jpg/{filename:path}")
+async def product_image_as_jpg(filename: str):
+    from PIL import Image
+    import io
+
+    source = WEB_DIR / "assets" / "products" / filename
+    if not source.is_file():
+        logger.warning("[product_image_as_jpg] Requested file not found: %s", source)
+        return Response(status_code=404)
+    try:
+        with Image.open(source) as img:
+            buf = io.BytesIO()
+            img.convert("RGB").save(buf, format="JPEG", quality=90)
+        return Response(content=buf.getvalue(), media_type="image/jpeg")
+    except Exception as e:
+        logger.error("[product_image_as_jpg] Failed to convert %s to JPEG: %s", source, e)
+        return Response(status_code=500)
+
+
 app.mount("/assets", StaticFiles(directory=str(WEB_DIR / "assets")), name="assets")
 app.mount("/css", StaticFiles(directory=str(WEB_DIR / "css")), name="css")
 app.mount("/js", StaticFiles(directory=str(WEB_DIR / "js")), name="js")

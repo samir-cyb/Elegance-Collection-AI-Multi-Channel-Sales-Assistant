@@ -165,6 +165,58 @@ def resolve_image_tags(reply: str, products_data: dict) -> str:
     return resolved
 
 
+# Safety net: gemini-3.5-flash-lite is fast/cheap but not perfectly
+# reliable about following the "[SHOW_IMAGE: ...]" instruction, especially
+# when listing several products at once — it sometimes writes things like
+# "নিচে ছবি দেওয়া হলো" (pictures given below) and then doesn't actually
+# emit any tag, so the customer sees text but no photos. When that happens
+# AND the customer's message clearly asked to see picture(s), this finds
+# every product the reply mentions by name and appends its (already
+# resolved, real) image right after that product's line — so a photo
+# still shows up even when the model forgot the tag.
+_PHOTO_REQUEST_WORDS = (
+    "ছবি", "picture", "photo", "pic ", "pics", "দেখতে চাই", "দেখাও", "দেখান", "show me",
+)
+
+
+def _wants_photos(message: str) -> bool:
+    text = (message or "").lower()
+    return any(word.lower() in text for word in _PHOTO_REQUEST_WORDS)
+
+
+def inject_missing_images(reply: str, products_data: dict, message: str) -> str:
+    if "![" in reply or not _wants_photos(message):
+        # Either the model already included real image(s), or the customer
+        # never asked for pictures this turn — nothing to fix.
+        return reply
+
+    lines = reply.split("\n")
+    out_lines = []
+    already_shown = set()
+    for line in lines:
+        out_lines.append(line)
+        for product in products_data["products"]:
+            if product["id"] in already_shown:
+                continue
+            if product["name_bn"] and product["name_bn"] in line:
+                color_entry = product["colors"][0] if product["colors"] else None
+                if not color_entry:
+                    continue
+                alt = f"{product['name_bn']} - {color_entry['name']}"
+                url = "/assets/products/" + urllib.parse.quote(color_entry["image"])
+                out_lines.append(f"![{alt}]({url})")
+                already_shown.add(product["id"])
+
+    if already_shown:
+        logger.warning(
+            "[image_tag] Model mentioned %d product(s) but emitted no [SHOW_IMAGE] tag for them "
+            "even though the customer asked for photos — auto-injected: %s",
+            len(already_shown), sorted(already_shown),
+        )
+        return "\n".join(out_lines)
+    return reply
+
+
 def build_system_prompt(shop_name_bn: str, products: list) -> str:
     return f"""
 তুমি '{shop_name_bn}' নামের একটি বাংলাদেশি অনলাইন লেডিস ড্রেস শপের AI সহকারী।
@@ -210,6 +262,8 @@ def build_system_prompt(shop_name_bn: str, products: list) -> str:
 - কাস্টমার একাধিক রঙ দেখতে চাইলে (যেমন "সব রং দেখান"), একাধিক ট্যাগ ব্যবহার করবে, প্রতিটা আলাদা লাইনে — যতগুলো রং আছে সবগুলোর জন্য একটা করে ট্যাগ
 - এই ট্যাগটা ছবি হিসেবে automatically রেন্ডার হয়ে যাবে, তুমি ছবির URL বা লিংক নিজে বানানোর চেষ্টা করবে না, শুধু এই ট্যাগ ফরম্যাটটাই ব্যবহার করবে
 - ট্যাগ বসানোর সাথে সাথেই একটা ছোট উষ্ণ বাক্য লিখবে (যেমন: "এই যে দেখুন! 😍")
+- **এটা বাধ্যতামূলক, ঐচ্ছিক না:** একসাথে একাধিক (২টা, ৩টা বা তার বেশি) পণ্য তালিকা আকারে দেখানোর সময়ও, যে কয়টা পণ্যের নাম উল্লেখ করছ তার **প্রতিটার জন্যই** আলাদা আলাদা [SHOW_IMAGE: ...] ট্যাগ বসাবে — শুধু প্রথমটা বা একটা পণ্যে বসিয়ে বাকিগুলো বাদ দেবে না
+- কখনোই "নিচে ছবি দেওয়া হলো" / "ছবি দেখুন" / এই জাতীয় কথা লিখবে না যদি সাথে সাথেই আসল [SHOW_IMAGE: ...] ট্যাগ না বসাও — কথা আর ট্যাগ সবসময় একসাথে থাকবে
 
 কাস্টমার যখন নিজে একটা ছবি পাঠায় (যেমন কোথাও দেখা কোনো ড্রেসের ছবি, বা "এই রকম কিছু আছে?" জিজ্ঞেস করার জন্য):
 - এই মেসেজের সাথে তোমাকে কাস্টমারের ছবির পাশাপাশি আমাদের প্রতিটা পণ্যের আসল রেফারেন্স ছবিও দেওয়া হচ্ছে, প্রতিটার আগে লেখা আছে সেটা কোন প্রোডাক্ট আইডি ও রং
@@ -398,6 +452,7 @@ def chat(user_id: str, message: str, image_base64: str = None, image_mime: str =
         raise
 
     reply = resolve_image_tags(response.text, data)
+    reply = inject_missing_images(reply, data, message)
     elapsed = time.time() - t0
     logger.info(
         "[chat] user=%s reply_length=%d chars, took=%.2fs, reply_preview=%r",

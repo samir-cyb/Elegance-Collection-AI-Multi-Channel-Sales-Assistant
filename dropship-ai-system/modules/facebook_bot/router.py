@@ -47,7 +47,14 @@ def _split_text_and_images(reply: str, base_url: str) -> tuple[str, list[str]]:
     image_urls = []
 
     def _extract(match):
-        image_urls.append(urljoin(base_url, match.group(2)))
+        url = match.group(2)
+        # Facebook's Send API frequently rejects .webp attachments with
+        # "(#100) Upload failed" — main.py exposes a /assets/products-jpg/
+        # route that converts the same file to JPEG on the fly, so route
+        # Facebook (only Facebook — the website keeps using the original
+        # webp path, which it renders fine) through that instead.
+        url = url.replace("/assets/products/", "/assets/products-jpg/", 1)
+        image_urls.append(urljoin(base_url, url))
         return ""
 
     text_only = _MD_IMAGE_RE.sub(_extract, reply)
@@ -123,6 +130,21 @@ async def fb_message(request: Request):
             sender = event.get("sender", {}).get("id")
             if not sender:
                 logger.warning("[fb_message] Event had no sender.id, skipping: %s", event)
+                continue
+
+            # CRITICAL: every message our own Page sends back to a customer
+            # (via send_fb_reply/send_fb_image) is echoed back to THIS SAME
+            # webhook by Facebook, as a "message_echoes" event with
+            # message.is_echo = true — sender.id there is the PAGE, not the
+            # customer. Without this check, the bot's own reply gets treated
+            # as a new incoming message, which makes it reply to itself
+            # forever (exactly the "messaging non-stop" bug). Always ignore
+            # echoes; never generate a reply for one.
+            if event.get("message", {}).get("is_echo"):
+                logger.debug(
+                    "[fb_message] Ignoring echo of our own outgoing message (sender=%s) — "
+                    "not a real customer message.", sender,
+                )
                 continue
 
             msg = event.get("message", {}).get("text", "")

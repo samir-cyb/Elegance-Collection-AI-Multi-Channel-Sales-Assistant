@@ -6,3 +6,4 @@ python-dotenv
 sentence-transformers
 faiss-cpu
 numpy
+Pillow
